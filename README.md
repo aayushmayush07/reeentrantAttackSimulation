@@ -1,66 +1,64 @@
-## Foundry
+# 🛡️ Reentrancy Attack Simulation
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This repository demonstrates how a **reentrancy attack** works in Solidity using [Foundry](https://book.getfoundry.sh/).  
+It contains:
+- A vulnerable vault (`VulnerableVault.sol`)
+- An attacker contract (`Attacker.sol`)
+- A Foundry test (`Reentrancy.t.sol`) that drains the vault
 
-Foundry consists of:
+---
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## 📂 Project Structure
 
-## Documentation
+src/
+├── VulnerableVault.sol # The intentionally vulnerable vault
+└── Attacker.sol # Attacker contract exploiting the vault
+test/
+└── Reentrancy.t.sol # Foundry test simulating the attack
 
-https://book.getfoundry.sh/
+yaml
+Copy code
 
-## Usage
+---
 
-### Build
+## ⚡ Setup
 
-```shell
-$ forge build
-```
+Make sure you have [Foundry installed](https://book.getfoundry.sh/getting-started/installation):
 
-### Test
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+Clone this repo and install dependencies:
 
-```shell
-$ forge test
-```
+bash
+Copy code
+git clone <your-repo-url> reentrantAttackSimulation
+cd reentrantAttackSimulation
+forge install
+▶️ Run the Attack
+Run the test:
 
-### Format
+bash
+Copy code
+forge test -vv
+Expected output:
 
-```shell
-$ forge fmt
-```
+Victim deposits 10 ETH into the vault
 
-### Gas Snapshots
+Attacker deposits 1 ETH
 
-```shell
-$ forge snapshot
-```
+Attacker re-enters multiple times during withdrawal
 
-### Anvil
+Vault is drained to 0
 
-```shell
-$ anvil
-```
+Attacker ends up with 11 ETH (1 deposit + 10 stolen)
 
-### Deploy
+🧨 Vulnerability Explanation
+The bug is in VulnerableVault.withdraw():
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+solidity
+Copy code
+(bool ok, ) = msg.sender.call{value: bal}(""); // external call
+require(ok, "send failed");
+balances[msg.sender] = 0; // ❌ too late: state updated after external call
+Because the balance is updated after the transfer, the attacker can re-enter via their contract’s receive() function and withdraw repeatedly.
